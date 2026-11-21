@@ -1,6 +1,6 @@
 # openwrt-package-HiH
 
-自用 OpenWrt 软件包 feed，本地测试通过后上传，供固件编译使用。
+自用 OpenWrt 软件包 feed，测试中，请勿使用
 
 ## 使用方法
 
