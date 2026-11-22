@@ -25,7 +25,7 @@ jobs:
   build:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
@@ -39,16 +39,28 @@ jobs:
             gcc-multilib gettext git libncurses-dev libssl-dev \
             python3 python3-setuptools rsync swig unzip wget file \
             zlib1g-dev zstd patch perl
-            
+      
       - name: 恢复下载缓存
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
-          path: ~/sdk/*/dl
+          path: |
+            ~/sdk/*/dl
+            ~/sdk/*.tar.zst
           key: dl-${{ matrix.id }}-${{ hashFiles('build/packages.list') }}
-          restore-keys: dl-${{ matrix.id }}-
+          restore-keys: |
+            dl-${{ matrix.id }}-
 
       - name: 编译晋级清单
         run: bash scripts/build.sh "${{ matrix.id }}"
+
+      - name: 保存下载缓存（失败也存）
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/sdk/*/dl
+            ~/sdk/*.tar.zst
+          key: dl-${{ matrix.id }}-${{ hashFiles('build/packages.list') }}-${{ github.run_id }}
 
       - name: 保存 apk 签名工具（给发布任务用）
         run: |

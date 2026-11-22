@@ -10,7 +10,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 
 # 没点名包就读晋级清单
 if (($#)); then PKGS=("$@"); else
-  mapfile -t PKGS < <(grep -vE '^\s*(#|$)' "$ROOT/build/packages.list")
+  mapfile -t PKGS < <(sed 's/#.*//; s/^[[:space:]]*//; s/[[:space:]]*$//' "$ROOT/build/packages.list" | grep -v '^$')
 fi
 
 SDKDIR="$HOME/sdk/${TARGET//\//-}-sdk"    # x86/64 → ~/sdk/x86-64-sdk
