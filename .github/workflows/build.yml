@@ -1,0 +1,102 @@
+name: 编译·签名·发布
+
+on:
+  push: { branches: [ main ] }
+  pull_request: { branches: [ main ] }
+  workflow_dispatch: {}
+
+env:
+  RELEASE: "25.12.6"
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo 'matrix=[{"id":"x86/64"}]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'matrix=[{"id":"x86/64"},{"id":"rockchip/armv8"},{"id":"bcm27xx/bcm2711"}]' >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装编译依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex g++ gawk \
+            gcc-multilib gettext git libncurses-dev libssl-dev rsync \
+            unzip wget file zlib1g-dev zstd
+
+      - name: 恢复下载缓存
+        uses: actions/cache@v4
+        with:
+          path: ~/sdk/*/dl
+          key: dl-${{ matrix.id }}-${{ hashFiles('build/packages.list') }}
+          restore-keys: dl-${{ matrix.id }}-
+
+      - name: 编译晋级清单
+        run: bash scripts/build.sh "${{ matrix.id }}"
+
+      - name: 保存 apk 签名工具（给发布任务用）
+        run: |
+          APK=$(find ~/sdk -maxdepth 5 -path '*/staging_dir/host/bin/apk' -type f | head -1)
+          [ -n "$APK" ] || { echo "找不到 apk 工具"; exit 1; }
+          cp "$APK" dist/apk-bin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ strategy.job-index }}
+          path: dist/
+          retention-days: 7
+
+  publish:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist/
+          merge-multiple: true
+
+      - name: 签名并组装软件源
+        env:
+          OPENWRT_APK_PRIVATE_KEY: ${{ secrets.OPENWRT_APK_PRIVATE_KEY }}
+        run: |
+          chmod +x dist/apk-bin
+          printf '%s\n' "$OPENWRT_APK_PRIVATE_KEY" > /tmp/hih-priv.pem
+          APK_SIGN_KEY=/tmp/hih-priv.pem APK_TOOL="$GITHUB_WORKSPACE/dist/apk-bin" bash scripts/repo.sh
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: repo/
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

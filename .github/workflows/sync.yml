@@ -1,0 +1,41 @@
+name: 同步上游
+
+on:
+  schedule:
+    - cron: '0 18 * * 0'   # UTC 周日 18:00 = 北京时间周一凌晨 2 点
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 同步上游
+        run: bash scripts/sync.sh
+
+      - name: 有实质变化则创建 PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CHANGED=$(git status --porcelain | grep -v 'upstreams.lock' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "上游无实质更新"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          BRANCH="sync/$(date +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "同步上游 $(date +%F)"
+          git push -u origin "$BRANCH"
+          gh pr create \
+            --title "同步上游 $(date +%F)" \
+            --body "自动同步上游包。CI 全绿后点击合并，合并后自动出签名安装包。" \
+            --base main --head "$BRANCH" || true
