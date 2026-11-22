@@ -1,0 +1,15 @@
+# ==== 已通过本地测试、允许进入 CI 自动编译发布的包 ====
+# 晋级流程：本地编译 + 真机验收通过 → 在此加一行 → push
+# 这里写的是"编译目标"名（基本等于包名）
+luci-theme-7dollar
+luci-app-socat
+quickfile
+luci-app-quickfile
+luci-app-passwall
+xray-core
+oaf            # 一个目标带出两个包：appfilter + kmod-oaf
+luci-app-oaf
+
+# ==== 未验收，暂不晋级（测完取消注释即自动进入 CI）====
+# honk
+# luci-app-honk
