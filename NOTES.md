@@ -23,3 +23,12 @@
 - [ ] honk（Rust + eBPF，编译耗时以小时计，仅 64 位 + 新内核 + 需 vmlinux-btf）
 - [ ] R4S、树莓派 4 平台编译
 - [ ] 真机/虚拟机验收
+
+## 虚拟机验收阶段踩坑
+4. scp 报 sftp-server not found → scp 加 -O 参数（走传统协议）
+5. 虚拟机装包报 Operation not permitted / 一堆 no such package
+   → 虚拟机缺外网：加一块 NAT 网卡（x86 的 eth1 默认就是 WAN）
+   → 通网后 apk update 再装；dnsmasq 冲突就先 apk del dnsmasq
+6. apk 报 SSL EOF 连不上 downloads.openwrt.org → 换国内镜像：
+   sed -i 's_https\?://downloads.openwrt.org_https://mirrors.tuna.tsinghua.edu.cn/openwrt_' /etc/apk/repositories.d/distfeeds.list
+   （备选：mirrors.ustc.edu.cn/openwrt）
