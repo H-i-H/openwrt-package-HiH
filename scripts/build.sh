@@ -39,7 +39,7 @@ sed -i 's/GO_DEFAULT_VERSION:=1.26/GO_DEFAULT_VERSION:=1.27/' \
 
 make defconfig
 make package/golang1.27/compile V=s -j"$(nproc)"   # Go 工具链
-make target/linux/prepare                          # kmod 需要内核树
+make target/linux/prepare V=s -j1    # kmod 需要内核树
 
 for p in "${PKGS[@]}"; do
   echo "==> 编译 $p"
