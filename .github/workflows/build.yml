@@ -39,7 +39,7 @@ jobs:
             gcc-multilib gettext git libncurses-dev libssl-dev \
             python3 python3-setuptools rsync swig unzip wget file \
             zlib1g-dev zstd patch perl
-      
+
       - name: 恢复下载缓存
         uses: actions/cache/restore@v4
         with:
@@ -62,16 +62,27 @@ jobs:
             ~/sdk/*.tar.zst
           key: dl-${{ matrix.id }}-${{ hashFiles('build/packages.list') }}-${{ github.run_id }}
 
-      - name: 保存 apk 签名工具（给发布任务用）
-        run: |
-          APK=$(find ~/sdk -maxdepth 5 -path '*/staging_dir/host/bin/apk' -type f | head -1)
-          [ -n "$APK" ] || { echo "找不到 apk 工具"; exit 1; }
-          cp "$APK" dist/apk-bin
-
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ strategy.job-index }}
           path: dist/
+          retention-days: 7
+
+      - name: 签名并组装软件源（本架构）
+        env:
+          OPENWRT_APK_PRIVATE_KEY: ${{ secrets.OPENWRT_APK_PRIVATE_KEY }}
+        run: |
+          if [ -z "$OPENWRT_APK_PRIVATE_KEY" ]; then
+            echo "缺少签名密钥，跳过签名"; exit 0
+          fi
+          printf '%s\n' "$OPENWRT_APK_PRIVATE_KEY" > /tmp/hih-priv.pem
+          APK_SIGN_KEY=/tmp/hih-priv.pem bash scripts/repo.sh
+
+      - if: hashFiles('repo/hih.pem') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-${{ strategy.job-index }}
+          path: repo/
           retention-days: 7
 
   publish:
@@ -85,17 +96,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          pattern: dist-*
-          path: dist/
+          pattern: repo-*
+          path: repo/
           merge-multiple: true
 
-      - name: 签名并组装软件源
-        env:
-          OPENWRT_APK_PRIVATE_KEY: ${{ secrets.OPENWRT_APK_PRIVATE_KEY }}
-        run: |
-          chmod +x dist/apk-bin
-          printf '%s\n' "$OPENWRT_APK_PRIVATE_KEY" > /tmp/hih-priv.pem
-          APK_SIGN_KEY=/tmp/hih-priv.pem APK_TOOL="$GITHUB_WORKSPACE/dist/apk-bin" bash scripts/repo.sh
+      - name: 校验软件源结构
+        run: find repo -type f | sort
 
       - uses: actions/upload-pages-artifact@v3
         with:
