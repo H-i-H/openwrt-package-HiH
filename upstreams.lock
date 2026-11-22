@@ -1,0 +1,9 @@
+sync 2026-11-21 23:08:00
+luci-theme-7dollar https://github.com/itsmaiGe/luci-theme-7dollar 35aa4b4660aec932b17129517ad8a28f509c991e
+luci-app-socat https://github.com/chenmozhijin/luci-app-socat 1d54dc8b1f5dd9f73668b0f102a870a86144a88d
+feed https://github.com/sbwml/luci-app-quickfile ef2ca5d16ad1156539930d8763c3069f6ac4eb12
+feed https://github.com/destan19/OpenAppFilter 0814b87f57181ef238b9a21604c999e98de73cf2
+feed https://github.com/Openwrt-Passwall/openwrt-passwall b3cf8e768ba11d9172e9db7bdd6af17eaf8580f7
+feed https://github.com/Openwrt-Passwall/openwrt-passwall-packages a880c9046f8bd5d2d4f1fb6b8f2e70968c463322
+feed https://github.com/daeuniverse/openwrt-packages 8c6ed9bd00a99d7662cfd5bf15fb4eed393ce689
+honk/src https://github.com/daeuniverse/honk 8919784a6fe11fd8c6b9516b79f5553b93810ab2
