@@ -17,9 +17,9 @@ jobs:
       - id: set
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo 'matrix=[{"id":"x86/64"}]' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[{"id":"x86/64"}]}' >> "$GITHUB_OUTPUT"
           else
-            echo 'matrix=[{"id":"x86/64"},{"id":"rockchip/armv8"},{"id":"bcm27xx/bcm2711"}]' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[{"id":"x86/64"},{"id":"rockchip/armv8"},{"id":"bcm27xx/bcm2711"}]}' >> "$GITHUB_OUTPUT"
           fi
 
   build:
