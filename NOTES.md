@@ -16,7 +16,7 @@
    c. ./scripts/feeds install -f golang1.27
    d. make package/golang1.27/compile V=s（先编出 Go 1.27，十几分钟）
    e. 验证: ls staging_dir/hostpkg/lib/go-1.27/bin/ 应有 go
-3. kmod 编译前需: make target/linux/prepare
+3. kmod 编译：直接 make package/oaf/compile 即可，内核树由构建系统自动准备（SDK 无 target/linux/prepare 目标）
 
 ## 待办
 - [ ] sing-box / hysteria 等按需补编
