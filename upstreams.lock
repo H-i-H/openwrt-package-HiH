@@ -1,9 +1,9 @@
-sync 2026-11-21 23:08:00
-luci-theme-7dollar https://github.com/itsmaiGe/luci-theme-7dollar 35aa4b4660aec932b17129517ad8a28f509c991e
+sync 2026-11-22 22:52:26
+luci-theme-7dollar https://github.com/itsmaiGe/luci-theme-7dollar f9c783f91f5b55828de74bf57b29c39a49156639
 luci-app-socat https://github.com/chenmozhijin/luci-app-socat 1d54dc8b1f5dd9f73668b0f102a870a86144a88d
 feed https://github.com/sbwml/luci-app-quickfile ef2ca5d16ad1156539930d8763c3069f6ac4eb12
 feed https://github.com/destan19/OpenAppFilter 0814b87f57181ef238b9a21604c999e98de73cf2
-feed https://github.com/Openwrt-Passwall/openwrt-passwall b3cf8e768ba11d9172e9db7bdd6af17eaf8580f7
-feed https://github.com/Openwrt-Passwall/openwrt-passwall-packages a880c9046f8bd5d2d4f1fb6b8f2e70968c463322
-feed https://github.com/daeuniverse/openwrt-packages 8c6ed9bd00a99d7662cfd5bf15fb4eed393ce689
-honk/src https://github.com/daeuniverse/honk 8919784a6fe11fd8c6b9516b79f5553b93810ab2
+feed https://github.com/Openwrt-Passwall/openwrt-passwall 89ecdea8a44593c8055811c637b0c1a94d88453f
+feed https://github.com/Openwrt-Passwall/openwrt-passwall-packages 65ae3f5ec70c9613ae3ec41ee6e9baecb1828ff9
+feed https://github.com/daeuniverse/openwrt-packages e104a4930c5fc4f625f3355257626495685424f5
+honk/src https://github.com/daeuniverse/honk 7cd8b13cd2b71081bd9c554b80a6a0e9a0dbdc04
