@@ -9,7 +9,6 @@ use std::net::SocketAddr;
 use std::pin::pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use futures::FutureExt;
 use honk_outbound::proxy::vless::VisionSplice;
 use honk_outbound::transport_quality::RawObserver;
 use tokio::io::AsyncWriteExt;
@@ -41,16 +40,17 @@ pub(super) async fn relay_vision(
     progress: RelayProgress,
 ) -> anyhow::Result<RelayStats> {
     let start = tokio::time::Instant::now();
-    // Sniffed bytes accepted before relay startup already belong to this connection.
-    let before = (
-        progress.upload.load(Ordering::Relaxed),
-        progress.download.load(Ordering::Relaxed),
-    );
     debug!("Vision relay started: {} → {}", client_addr, target_addr);
     let result = relay_phases(client, &mut proxy, &progress).await;
-    let _ = client.shutdown().now_or_never();
-    let _ = proxy.shutdown().now_or_never();
-    let totals = result.map(|(upload, download)| (before.0 + upload, before.1 + download));
+    let _ = client.shutdown().await;
+    let _ = proxy.shutdown().await;
+    // Every phase counts into the same connection counters.
+    let totals = result.map(|()| {
+        (
+            progress.upload.load(Ordering::Relaxed),
+            progress.download.load(Ordering::Relaxed),
+        )
+    });
     super::relay_outcome(totals, start, client_addr, target_addr)
 }
 
@@ -58,22 +58,21 @@ async fn relay_phases(
     client: &mut TcpStream,
     proxy: &mut VisionSplice,
     progress: &RelayProgress,
-) -> Result<(u64, u64), RelayError> {
+) -> Result<(), RelayError> {
     let ready = proxy.ready_signal();
     let gate = || ready.load(Ordering::Relaxed) && moved(progress) >= SPLICE_AFTER_BYTES;
     let park = splice::splice_available().then(|| Park::new(&gate));
-    let (first_up, first_down) = copy(client, proxy, progress, park.as_ref()).await?;
+    copy(client, proxy, progress, park.as_ref()).await?;
     if !park.as_ref().is_some_and(Park::taken) {
-        return Ok((first_up, first_down));
+        return Ok(());
     }
     if let Some((raw, mut observer)) = proxy.raw_parts() {
         match splice_observed(client, raw, &mut observer, progress).await {
-            Ok((up, down)) => return Ok((first_up + up, first_down + down)),
+            Ok(()) => return Ok(()),
             Err(error) => error.into_fallback()?,
         }
     }
-    let (up, down) = copy(client, proxy, progress, None).await?;
-    Ok((first_up + up, first_down + down))
+    copy(client, proxy, progress, None).await
 }
 
 async fn copy(
@@ -81,9 +80,11 @@ async fn copy(
     proxy: &mut VisionSplice,
     progress: &RelayProgress,
     park: Option<&Park<'_>>,
-) -> Result<(u64, u64), RelayError> {
+) -> Result<(), RelayError> {
     let (mut client, mut proxy) = super::relay_io_pair(client, proxy, &phase_progress(progress));
-    super::copy_phase(&mut client, &mut proxy, park).await
+    super::copy_phase(&mut client, &mut proxy, park)
+        .await
+        .map(drop)
 }
 
 /// Splices the lent socket while sampling its carrier pressure whenever the
@@ -93,7 +94,7 @@ async fn splice_observed(
     raw: &TcpStream,
     observer: &mut RawObserver<'_>,
     progress: &RelayProgress,
-) -> Result<(u64, u64), SpliceError> {
+) -> Result<(), SpliceError> {
     let mut seen = moved(progress);
     let mut run = pin!(splice::run(client, raw, Some(phase_progress(progress))));
     std::future::poll_fn(|cx| {
@@ -105,6 +106,7 @@ async fn splice_observed(
         poll
     })
     .await
+    .map(drop)
 }
 
 fn moved(progress: &RelayProgress) -> u64 {

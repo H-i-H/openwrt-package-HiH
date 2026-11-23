@@ -64,9 +64,8 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
 use crate::proxy::{
-    AsyncReadWrite, MuxSession, PacketOutbound, PacketTransport, PreparedUdpTransport,
-    ProbeableOutbound, ProxyStream, SharedSourceOutbound, TcpOutbound, TunnelDialOptions,
-    WarmRequirement, WarmableOutbound,
+    MuxSession, PacketOutbound, PacketTransport, PreparedUdpTransport, ProbeableOutbound,
+    ProxyStream, SharedSourceOutbound, TcpOutbound, WarmRequirement, WarmableOutbound,
 };
 use crate::session::{OpenError, SpeculativeCheckout};
 
@@ -574,18 +573,6 @@ impl TcpOutbound for VLessHandler {
                 Self::open_cool_tcp(runtime, target, target_domain, connect_timeout).await
             }
         }
-    }
-
-    async fn dial_over(
-        &self,
-        runtime: Arc<crate::runtime::NodeRuntime>,
-        carrier: Box<dyn AsyncReadWrite>,
-        target: SocketAddr,
-        target_domain: Option<&str>,
-        options: TunnelDialOptions,
-    ) -> anyhow::Result<ProxyStream> {
-        self.dial_tunneled(&runtime.node, carrier, target, target_domain, options)
-            .await
     }
 }
 

@@ -50,15 +50,6 @@ impl TcpPressure {
     }
 }
 
-#[cfg(test)]
-impl TcpPressure {
-    /// The socket sample the carrier sampler holds as its baseline; `None`
-    /// without a sampler or before the first sample.
-    pub(crate) fn delivered_sample(&self) -> Option<CarrierSample> {
-        self.sampler.as_ref()?.previous
-    }
-}
-
 /// The observer is dormant through TLS/REALITY authentication and has no I/O
 /// authority: it neither owns another descriptor nor changes a poll result.
 #[derive(Debug)]

@@ -246,3 +246,49 @@ echo "https://h-i-h.github.io/openwrt-package-HiH/25.12.6/${DISTRIB_ARCH}/packag
 | 签名私钥 | 一次生成 | 本地 `~/.config/hih-keys/` + GitHub Secret 双备 |
 | kmod / vmlinux-btf | 随固件内核 | 内核变了必须重编（6.12.112 ↔ 25.12.6） |
 | honk 版本 | 随 Makefile | 改 `HONK_TAG` 后同步，源码必须对齐打包 tag |
+---
+
+## 九、最终 Boss：honk 战役补遗（2026-11）
+
+### 9.1 rustc 1.98 代差 —— 官方解法是 rustup，不是自编
+- 症状：编 honk 报 `aya@0.16.0 requires rustc 1.98.0`，SDK 的 lang/rust 停在 1.96（openwrt/packages master 亦然），无源可借。
+- 解法（抄 daeuniverse CI 的作业）：rustup 现成工具链，分钟级装配——
+  `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none`
+  `rustup toolchain install 1.99.1 --profile minimal --target x86_64-unknown-linux-musl`
+  `rustup toolchain install nightly-2026-10-20 --profile minimal --component rust-src --component llvm-tools`
+  + aya-rs 的预编译 bpf-linker 解压进 `~/.cargo/bin`。
+- 要点：版本号以 `honk/src/rust-toolchain.toml` 与 `crates/honk-ebpf/rust-toolchain.toml` 为准；进不同目录 rustup 自动换链。R4S 交叉编译再补 `--target aarch64-unknown-linux-musl`。
+
+### 9.2 PATH 冒牌货 —— SDK 的 rustc 顶包
+- 症状：rustup 装好后仍报 `rustc 1.96.0`。
+- 原因：make 内部 PATH 把 `staging_dir/host/bin` 顶到最前，SDK 自编的 lang/rust（依赖自动拉入）抢位；export 的 PATH 被压制。
+- 解法：在 `honk/build.sh` 里加 `[ -x "$HOME/.cargo/bin/cargo" ] && export PATH="$HOME/.cargo/bin:$PATH"`（脚本内部夺权）。
+- 规律：make 环境会覆盖你的 PATH，要在被执行的脚本里再抢一次。
+
+### 9.3 bindgen 要 libclang —— 系统库，不在 Rust 工具链里
+- 症状：panic `Unable to find libclang`。
+- 解法：`sudo pacman -S clang`（提供 `/usr/lib/libclang.so`）。
+- 旁证教训：日志里同时有捷报（`eBPF object embedded`）和败报，别把捷报当失败点。
+
+### 9.4 apk del 是原子操作 —— 一个错名，整单作废
+- 症状：清单里一个包名错 → `No such package` → **其余全不删**。
+- 要点：源码目录名 ≠ 设备包名（`open-app-filter` 在设备上叫 `appfilter`）；查名用 `apk info | grep 关键词`。
+
+### 9.5 /etc/apk/world 残留 —— 失败安装的心愿单后遗症
+- 症状：apk del 报 `honk (no such package): required by: world[...]`。
+- 原因：失败的 `apk add` 也会把包写进 world 心愿单，之后一切事务都要满足它。
+- 解法：`sed -i '/^honk/d' /etc/apk/world` 清残留行。
+
+### 9.6 双 BTF 包互斥 —— 传包别用通配
+- `vmlinux-btf`（真数据，官方内核用）与 `vmlinux-btf-builtin`（空占位，内核自带 BTF 的固件用）冲突，二选一。
+- `scp` 时 `vmlinux-btf*` 通配会捎带 builtin，装包当场报 conflicts。
+
+### 9.7 磁盘扩容真相：qemu-img resize 不涨分区
+- 症状：虚拟盘 2G 但 overlay 仅 86.4M，90MB 就 `No space left`。
+- 原因：resize 只扩磁盘外壳，分区表不动（之前"先扩后开机就有 2G"的说法有误）。
+- 待办：fdisk 同起始扇区重建分区 + resize2fs（测试 VM 练手，R4S/树莓派照搬）。
+- 附带坑：腾空间删了 nginx 后 80 端口无人值守 → `ERR_CONNECTION_REFUSED`，`/etc/init.d/uhttpd start` 复活（删 web 服务器前先看 `netstat -tlnp | grep :80` 谁在当家）。
+
+### 9.8 上游 pins.env 缺失
+- daeuniverse 工作流引用 `.github/ci/pins.env`（锁 bpf-linker 版本哈希），但仓库未含此文件。
+- 兜底：bpf-linker 取 aya-rs releases 最新版，`sha256sum` 自记防篡改。

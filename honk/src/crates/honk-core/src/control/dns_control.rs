@@ -174,7 +174,8 @@ impl DnsController {
 
     /// Resolve a domain (A + AAAA) through the *currently installed*
     /// forwarder — reload-safe, unlike holding a resolver from startup.
-    /// Hosts aliases and claiming `subtag()` rules take precedence for node hosts.
+    /// Used by the health-check resolver hook. Raw TCP probes resolve node
+    /// server hosts here, so a claiming `subtag()` rule applies first.
     pub async fn resolve_domain(&self, domain: &str) -> anyhow::Result<Vec<std::net::IpAddr>> {
         if let Some(addresses) = self.dns_service.resolve_node_host(domain).await? {
             return Ok(addresses);
@@ -405,19 +406,7 @@ impl DnsController {
             28 => Some(IpVersion::V6),
             _ => None,
         };
-        // Only outcomes that can change the projection pay for the wire checks.
-        let projects = outcome.status() == OutcomeStatus::Accepted
-            && matches!(
-                (outcome.response_class(), family),
-                (ResponseClass::Positive | ResponseClass::Nodata, Some(_))
-                    | (ResponseClass::Nxdomain, _)
-            );
-        let observation = if projects
-            && (crate::dns::response::is_truncated(outcome.reusable())
-                || !matches!(
-                    crate::dns::response::response_rcode(outcome.reusable()),
-                    Ok(0 | 3)
-                )) {
+        let observation = if crate::dns::response::is_truncated(outcome.reusable()) {
             ProjectionObservation::Retain
         } else {
             match (outcome.status(), outcome.response_class(), family) {

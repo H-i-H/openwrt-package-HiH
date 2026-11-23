@@ -263,12 +263,14 @@ pub(super) async fn mutate(
                         json!({"resource":"/providers","field":"kind","allowed":["subscription"]}),
                     ));
                 }
-                // The writer quotes any other name it can hold, and rejects the rest.
-                if !(1..=64).contains(&input.name.chars().count())
-                    || input.name.chars().any(char::is_control)
+                if !(1..=64).contains(&input.name.len())
+                    || !input
+                        .name
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || b"_.-".contains(&c))
                 {
                     return rejected(
-                        "Provider name must be 1 to 64 characters without control characters",
+                        "Provider name must be 1 to 64 ASCII letters, digits, '_', '.' or '-'",
                         "name",
                     );
                 }

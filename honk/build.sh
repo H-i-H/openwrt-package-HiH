@@ -38,6 +38,8 @@ esac
 
 # OpenWrt's build system exports flags for autotools style packages; the Rust
 # crates and CMake derive their own flags from the compiler wrappers below
+# 用 rustup 工具链（SDK 自带的 lang/rust 版本太旧，跑不动 aya）
+[ -x "$HOME/.cargo/bin/cargo" ] && export PATH="$HOME/.cargo/bin:$PATH"
 unset CFLAGS CPPFLAGS CXXFLAGS LDFLAGS RUSTFLAGS CARGO_ENCODED_RUSTFLAGS
 
 echo "honk: building ${version} from tag ${tag} for ${HONK_ARCH_PACKAGES} (${target})"

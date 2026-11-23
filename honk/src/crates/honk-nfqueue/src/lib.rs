@@ -39,7 +39,6 @@ pub fn preflight() -> Result<(), PreflightError> {
     queue::preflight().map_err(|error| match error {
         queue::QueueError::Busy => PreflightError::QueueBusy,
         queue::QueueError::Io(error) => PreflightError::Queue(error),
-        error @ queue::QueueError::Unavailable => PreflightError::Queue(io::Error::other(error)),
     })
 }
 
