@@ -25,6 +25,22 @@
 - **自动化**：每周上游同步 PR + CI 三平台（x86_64 / R4S / 树莓派 4）编译签名发布；
 - **可复现**：本地脚本与 CI 共用同一套构建逻辑，全量踩坑记录见 [NOTES.md](NOTES.md)。
 
+## 仓库结构
+
+```text
+├── build/packages.list        # 晋级清单：本地测过的包才进 CI 发布
+├── scripts/
+│   ├── sync.sh                # 上游同步（honk 版本锁 HONK_TAG）
+│   ├── build.sh               # 统一编译脚本（本地与 CI 共用）
+│   └── repo.sh                # 签名 + 组装 APK 软件源
+├── .github/workflows/
+│   ├── build.yml              # 编译·签名·发布（PR 单平台验证 / main 三平台发布）
+│   └── sync.yml               # 每周上游同步 → 自动开 PR
+├── hih.pem                    # 软件源签名公钥
+├── NOTES.md                   # 全量踩坑笔记（症状→原因→解法）
+└── <各软件包目录>              # 标准 OpenWrt feed 布局
+```
+
 ## 快速开始
 
 ### 用法 A · 设备直装（签名源）
@@ -40,12 +56,39 @@ echo "https://h-i-h.github.io/openwrt-package-HiH/25.12.6/${DISTRIB_ARCH}/packag
 apk update
 ```
 
-之后即装即用：
+然后按需安装，包单个陈列如下：
 
 ```shell
-apk add luci-theme-7dollar luci-app-socat quickfile luci-app-quickfile
+# 主题
+apk add luci-theme-7dollar
+
+# 端口转发管理（自动带入 socat 本体）
+apk add luci-app-socat
+
+# 文件管理器（主程序 + Web 界面）
+apk add quickfile luci-app-quickfile
+
+# 代理（前端 + 核心；chinadns-ng、v2ray-geoip 等依赖自动拉取）
+apk add luci-app-passwall xray-core
+
+# 应用过滤（守护进程 + 内核模块 + 界面）
+apk add appfilter kmod-oaf luci-app-oaf
+
+# eBPF 透明代理 + Doona 面板（vmlinux-btf 自动带入，仅 64 位）
+apk add honk luci-app-honk luci-lib-daeuniverse
+
+# 中文语言包（按需）
+apk add luci-i18n-socat-zh-cn luci-i18n-quickfile-zh-cn \
+        luci-i18n-oaf-zh-cn luci-i18n-passwall-zh-cn
+
+# 喜欢一次装齐的（可选）
+apk add luci-theme-7dollar luci-app-socat quickfile luci-app-quickfile \
+        luci-app-passwall xray-core appfilter kmod-oaf luci-app-oaf \
+        honk luci-app-honk luci-lib-daeuniverse
 ```
 
+> 备注：应用过滤的守护进程包名是 `appfilter`（源码目录名为 oaf）；`kmod-oaf` 仅适配内核 6.12.112。honk 依赖的 `vmlinux-btf` 会自动带入——若固件内核自带 BTF（如 ImmortalWrt），改装 `vmlinux-btf-builtin` 并卸载 `vmlinux-btf`。备用包 smartdns、dae、luci-app-dae 同法 `apk add <名称>` 即装。
+>
 > 架构名务必用 `${DISTRIB_ARCH}`，不要用 `$(apk --print-arch)`（两者不同，详见 [NOTES 7.2](NOTES.md)）。中国大陆网络若 `apk update` 报 SSL 超时，将官方源换为国内镜像（见 [NOTES 2.3](NOTES.md)）。
 
 ### 用法 B · 编译固件时作为 Feed
@@ -87,7 +130,7 @@ APK_SIGN_KEY=<私钥> bash scripts/repo.sh    # 签名并组装软件源（repo/
 | luci-theme-7dollar | LuCI 主题 | [itsmaiGe/luci-theme-7dollar](https://github.com/itsmaiGe/luci-theme-7dollar) |
 | luci-app-socat | 端口转发管理（firewall4 兼容） | [chenmozhijin/luci-app-socat](https://github.com/chenmozhijin/luci-app-socat) |
 | quickfile / luci-app-quickfile | 文件管理器（主程序 + Web 界面） | [sbwml/luci-app-quickfile](https://github.com/sbwml/luci-app-quickfile) |
-| oaf / open-app-filter / luci-app-oaf | 应用过滤（含 kmod-oaf 内核模块） | [destan19/OpenAppFilter](https://github.com/destan19/OpenAppFilter) |
+| appfilter / kmod-oaf / luci-app-oaf | 应用过滤（守护进程 + 内核模块 + 界面） | [destan19/OpenAppFilter](https://github.com/destan19/OpenAppFilter) |
 | luci-app-passwall | 代理前端 | [Openwrt-Passwall/openwrt-passwall](https://github.com/Openwrt-Passwall/openwrt-passwall) |
 | xray-core 等 17 个依赖包 | passwall 运行依赖（sing-box、hysteria、chinadns-ng…） | [Openwrt-Passwall/openwrt-passwall-packages](https://github.com/Openwrt-Passwall/openwrt-passwall-packages) |
 | honk / luci-app-honk / luci-lib-daeuniverse | eBPF 透明代理引擎 + Doona 面板（仅 64 位） | [daeuniverse/openwrt-packages](https://github.com/daeuniverse/openwrt-packages) |
@@ -113,22 +156,6 @@ APK_SIGN_KEY=<私钥> bash scripts/repo.sh    # 签名并组装软件源（repo/
 | honk | 仅 64 位；需 25.12 系内核 + BTF；kmod-veth、kmod-sched-bpf 等依赖安装时自动拉取 |
 
 > honk 装好后，Doona 面板默认监听 `http://<路由器IP>:9527`，首次打开按提示创建用户。
-
-## 仓库结构
-
-```text
-├── build/packages.list        # 晋级清单：本地测过的包才进 CI 发布
-├── scripts/
-│   ├── sync.sh                # 上游同步（honk 版本锁 HONK_TAG）
-│   ├── build.sh               # 统一编译脚本（本地与 CI 共用）
-│   └── repo.sh                # 签名 + 组装 APK 软件源
-├── .github/workflows/
-│   ├── build.yml              # 编译·签名·发布（PR 单平台验证 / main 三平台发布）
-│   └── sync.yml               # 每周上游同步 → 自动开 PR
-├── hih.pem                    # 软件源签名公钥
-├── NOTES.md                   # 全量踩坑笔记（症状→原因→解法）
-└── <各软件包目录>              # 标准 OpenWrt feed 布局
-```
 
 ## 维护
 
