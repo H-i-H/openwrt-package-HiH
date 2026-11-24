@@ -40,6 +40,31 @@ sed -i 's/GO_DEFAULT_VERSION:=1.26/GO_DEFAULT_VERSION:=1.27/' \
 make defconfig
 make package/golang1.27/compile V=s -j"$(nproc)"   # Go 工具链
 
+# ---- honk 特例：需要 rustup 工具链（SDK 的 lang/rust 版本不足，见 NOTES 9.1）----
+if printf '%s\n' "${PKGS[@]}" | grep -qE '^(honk|luci-app-honk)$'; then
+  export PATH="$HOME/.cargo/bin:$PATH"
+  if ! command -v rustup >/dev/null 2>&1; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
+    export PATH="$HOME/.cargo/bin:$PATH"
+  fi
+  HONK_STABLE=$(grep -oP '^channel\s*=\s*"\K[^"]+' "$ROOT/honk/src/rust-toolchain.toml" 2>/dev/null || echo stable)
+  HONK_NIGHTLY=$(grep -oP '^channel\s*=\s*"\K[^"]+' "$ROOT/honk/src/crates/honk-ebpf/rust-toolchain.toml")
+  case "$TARGET" in
+    x86/64)          RUST_TARGET=x86_64-unknown-linux-musl ;;
+    rockchip/armv8|bcm27xx/bcm2711) RUST_TARGET=aarch64-unknown-linux-musl ;;
+    *)               RUST_TARGET="" ;;
+  esac
+  [ -n "$RUST_TARGET" ] && rustup toolchain install "$HONK_STABLE" --profile minimal --target "$RUST_TARGET"
+  rustup toolchain install "$HONK_NIGHTLY" --profile minimal --component rust-src --component llvm-tools
+  if ! command -v bpf-linker >/dev/null 2>&1; then
+    BPFL_VER=$(curl -s https://api.github.com/repos/aya-rs/bpf-linker/releases/latest | grep -oP '"tag_name": "\K[^"]+' | sed 's/^v//')
+    curl -fsSL --retry 3 -o /tmp/bpf-linker.tar.zst \
+      "https://github.com/aya-rs/bpf-linker/releases/download/v${BPFL_VER}/bpf-linker-x86_64-unknown-linux-musl.tar.zst"
+    zstd -dc /tmp/bpf-linker.tar.zst | tar -xf - -C "$HOME/.cargo/bin"
+    bpf-linker --version
+  fi
+fi
+
 # ---- vmlinux-btf 特例：honk/dae 的依赖链会拽出它，必须带参数编译 ----
 BTF_VER=${BTF_VER:-6.12.112}
 BTF_TAG=${BTF_TAG:-openwrt-25.12.6-6.12.112-20261122}

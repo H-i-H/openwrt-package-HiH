@@ -12,5 +12,5 @@ vmlinux-btf
 luci-app-oaf
 
 # ==== 未验收，暂不晋级（测完取消注释即自动进入 CI）====
-# honk
-# luci-app-honk
+honk
+luci-app-honk
