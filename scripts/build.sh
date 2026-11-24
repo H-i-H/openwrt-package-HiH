@@ -40,15 +40,39 @@ sed -i 's/GO_DEFAULT_VERSION:=1.26/GO_DEFAULT_VERSION:=1.27/' \
 make defconfig
 make package/golang1.27/compile V=s -j"$(nproc)"   # Go 工具链
 
+# ---- vmlinux-btf 特例：honk/dae 的依赖链会拽出它，必须带参数编译 ----
+BTF_VER=${BTF_VER:-6.12.112}
+BTF_TAG=${BTF_TAG:-openwrt-25.12.6-6.12.112-20261122}
+T=${TARGET//\//-}                       # x86/64 → x86-64
+BTF_TAR="25.12.6-vmlinux-${T}-${BTF_VER}.tar.xz"
+if [ ! -f "dl/$BTF_TAR" ]; then
+  wget -c -q --show-progress -P dl \
+    "https://github.com/daeuniverse/openwrt-packages/releases/download/${BTF_TAG}/${BTF_TAR}" \
+    || echo "警告: BTF 下载失败，可手动把 $BTF_TAR 放进 $(pwd)/dl/ 再重跑"
+fi
+BLOB=""
+if [ -f "dl/$BTF_TAR" ]; then
+  rm -rf tmp-btf && mkdir tmp-btf
+  tar xf "dl/$BTF_TAR" -C tmp-btf
+  for f in $(find tmp-btf -type f); do
+    [ "$(od -An -tx1 -N2 "$f" | tr -d ' \n')" = "9feb" ] && { BLOB="$PWD/$f"; break; }
+  done
+fi
+
 for p in "${PKGS[@]}"; do
   echo "==> 编译 $p"
-  make "package/$p/compile" V=s -j"$(nproc)"
+  if [ -n "$BLOB" ]; then
+    make "package/$p/compile" V=s -j"$(nproc)" \
+      VMLINUX_BTF_SRC="$BLOB" VMLINUX_BTF_VERSION="$BTF_VER"
+  else
+    make "package/$p/compile" V=s -j"$(nproc)"
+  fi
 done
 
 # 收集产物：本 feed 的包 + 内核模块 → dist/<架构>/
 ARCH=$(find bin/packages -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | head -1)
 DEST="$ROOT/dist/$ARCH"; mkdir -p "$DEST"
 find "bin/packages/$ARCH/HiH" -name '*.apk' -exec cp {} "$DEST/" \;
-find bin/targets -name '*.apk' -exec cp {} "$DEST/" \;
+find bin/targets -name 'kmod-oaf-*.apk' -exec cp {} "$DEST/" \;   # 只收本仓库的内核模块
 echo "==> 产物收集完毕: $DEST"
 ls "$DEST"

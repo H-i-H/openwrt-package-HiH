@@ -8,6 +8,7 @@ luci-app-quickfile
 luci-app-passwall
 xray-core
 oaf
+vmlinux-btf
 luci-app-oaf
 
 # ==== 未验收，暂不晋级（测完取消注释即自动进入 CI）====
