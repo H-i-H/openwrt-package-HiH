@@ -291,3 +291,9 @@ sed -i '/^honk/d; /^v2ray-geoip/d' /etc/apk/world
 ### 9.8 上游的 pins.env 没随仓库发布
 
 daeuniverse 的工作流引用 `.github/ci/pins.env`（锁 bpf-linker 的版本和哈希），但仓库里没这个文件。本地构建就退而求其次：bpf-linker 取 aya-rs Releases 的最新版，`sha256sum` 自己记一笔防篡改。真要复现官方的精确版本，等他们把锁文件补上。
+### 9.9 CI 静默死亡：GitHub API 速率墙
+- 症状：任务在工具链准备段无声失败（exit code 1，前后无任何报错行），日志中段找都找不到。
+- 原因：匿名调用 api.github.com 撞上 CI 共享出口 IP 的速率墙；curl 拿回错误 JSON 后
+  grep 无匹配 → pipefail 令赋值失败 → set -e 处决脚本，全程零输出。
+- 解法：bpf-linker 版本钉死 0.13.0（BPF_LINKER_VERSION 可覆盖），不再查 API。
+- 心法：CI 里能不调匿名 API 就不调；set -euo pipefail 下"命令替换赋值"是静默死亡高发区。

@@ -57,7 +57,7 @@ if printf '%s\n' "${PKGS[@]}" | grep -qE '^(honk|luci-app-honk)$'; then
   [ -n "$RUST_TARGET" ] && rustup toolchain install "$HONK_STABLE" --profile minimal --target "$RUST_TARGET"
   rustup toolchain install "$HONK_NIGHTLY" --profile minimal --component rust-src --component llvm-tools
   if ! command -v bpf-linker >/dev/null 2>&1; then
-    BPFL_VER=$(curl -s https://api.github.com/repos/aya-rs/bpf-linker/releases/latest | grep -oP '"tag_name": "\K[^"]+' | sed 's/^v//')
+    BPFL_VER=${BPF_LINKER_VERSION:-0.13.0}
     curl -fsSL --retry 3 -o /tmp/bpf-linker.tar.zst \
       "https://github.com/aya-rs/bpf-linker/releases/download/v${BPFL_VER}/bpf-linker-x86_64-unknown-linux-musl.tar.zst"
     zstd -dc /tmp/bpf-linker.tar.zst | tar -xf - -C "$HOME/.cargo/bin"
