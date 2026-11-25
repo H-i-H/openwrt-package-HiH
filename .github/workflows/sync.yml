@@ -21,7 +21,7 @@ jobs:
 
       - name: 有实质变化则创建 PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SYNC_PAT }}
         run: |
           CHANGED=$(git status --porcelain | grep -v 'upstreams.lock' || true)
           if [ -z "$CHANGED" ]; then
@@ -39,3 +39,4 @@ jobs:
             --title "同步上游 $(date +%F)" \
             --body "自动同步上游包。CI 全绿后点击合并，合并后自动出签名安装包。" \
             --base main --head "$BRANCH" || true
+          gh pr merge "$BRANCH" --auto --squash || true
