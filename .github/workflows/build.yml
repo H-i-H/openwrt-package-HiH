@@ -5,10 +5,12 @@ on:
     branches: [ main ]
     paths-ignore:
       - '**.md'
+      - 'firmware/**'
   pull_request:
     branches: [ main ]
     paths-ignore:
       - '**.md'
+      - 'firmware/**'
   workflow_dispatch: {}
 
 concurrency:
