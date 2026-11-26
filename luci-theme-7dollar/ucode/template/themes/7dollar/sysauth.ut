@@ -6,7 +6,7 @@
 {% include('header', { blank_page: true }) %}
 
 {%
-	import { model } from '../../../7dollar';
+	import { model } from 'luci.7dollar';
 
 	const board = ubus.call('system', 'board') ?? {};
 	const lang = dispatcher.lang ?? '';

@@ -5,7 +5,7 @@
 
 {%
 	import { getuid, getspnam } from 'luci.core';
-	import { model as boardModel } from '../../../7dollar';
+	import { model as boardModel } from 'luci.7dollar';
 
 	const boardinfo = ubus.call('system', 'board') ?? {};
 	const conf = uci.get_all('7dollar', 'main') ?? {};
