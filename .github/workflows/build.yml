@@ -62,7 +62,7 @@ jobs:
           restore-keys: |
             dl-${{ matrix.id }}-
 
-      - name: 编译晋级清单
+      - name: 编译收录包
         run: bash scripts/build.sh "${{ matrix.id }}"
 
       - name: 保存下载缓存（失败也存）

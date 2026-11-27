@@ -297,3 +297,69 @@ daeuniverse 的工作流引用 `.github/ci/pins.env`（锁 bpf-linker 的版本�
   grep 无匹配 → pipefail 令赋值失败 → set -e 处决脚本，全程零输出。
 - 解法：bpf-linker 版本钉死 0.13.0（BPF_LINKER_VERSION 可覆盖），不再查 API。
 - 心法：CI 里能不调匿名 API 就不调；set -euo pipefail 下"命令替换赋值"是静默死亡高发区。
+
+## 第十章：自动化产线实战教训（2026-11 固件构建战役）
+
+### 10.1 sed 三连坑：替换文本里的元字符
+
+本周连踩三次，全部出在"替换文本含特殊字符"上：
+
+| 字符 | 在 sed 里的真实语义 | 事故 |
+|---|---|---|
+| & | 替换文本里代表"整个匹配内容" | `&& break` 被写成"匹配打印两遍 + break"，命令结构被毁 |
+| ; | feeds.conf 处理链里被当命令分隔符 | `URL;SHA` 钉版导致 5 个 feed 全部静默消失 |
+| / | s/.../.../ 的分隔符 | 替换文本含路径（带 /）时报 unknown option to 's' |
+
+对策三条：
+1. 含特殊字符的替换一律换分隔符：sed 's|原文|替换|'；
+2. 含 & 的替换文本写 \&，或干脆用 awk 的 print 字面量（零歧义）；
+3. sed 找不到匹配时静默跳过——**替换后必须 grep 验证**，否则错误推迟数小时才在编译里暴露。
+
+### 10.2 粘贴渲染病
+
+大段命令粘贴到终端时，渲染层会吞字符：转义括号被改写、heredoc 开头混入碎片、中文被吞。对策：分小块粘贴、每块等提示符回来再贴下一块；粘完 grep 验证关键行。两次事故（发布命令的 find 括号、workflow 花括号）同根同源。
+
+### 10.3 缓存恢复撞上源码克隆
+
+actions/cache 把上轮的下载缓存恢复到工作目录后，git clone 拒绝非空目录（destination exists and is not an empty directory）。对策：改用 git init + fetch --depth 1 提交哈希 + checkout FETCH_HEAD——对已有目录免疫，还省掉整个仓库的历史下载。附带教训：失败缓存（if: always()）两轮实战立功，但它的回流效应要预判。
+
+### 10.4 GITHUB_TOKEN 递归保护
+
+GITHUB_TOKEN 触发的事件不再触发其他 workflow。同步机器人用它开 PR，构建检查永远不会跑，自动合并永远等不到绿灯——不红不闹的静默死锁。对策：给同步流程配 PAT（存 Secret），事件链才通。PAT 用 fine-grained 锁单一仓库最稳，权限选不动时退回 classic 的 repo 域。
+
+### 10.5 feeds 钉版语法
+
+正确写法 URL^提交哈希（^ 对 shell 无意义）；URL;提交哈希 的分号会被拆掉导致 feed 静默消失。验证方法：feeds update 后 git -C feeds/名字 log -1 看实际落点。另一条原则：钉版要钉"验证过的组合"（本地跑通 defconfig 的那套），不是随手查的瞬间。
+
+### 10.6 ttyd 与 libwebsockets 5.1 兼容
+
+症状：ttyd 启动、监听 7681、十几毫秒后 lws_context_destroy 干净退出（退出码 0）。原因：libwebsockets 5.1 起 lws_service 只跑一轮，ttyd 1.7.7 主循环没适配。对策：上游补丁 fddd638（直接驱动 libuv 事件循环），放进包的 patches/ 目录随构建应用。教训：web 终端这类"编译进固件的小服务"要进刷机验收清单，别默认它是好的。
+
+### 10.7 发布 job 的仓库上下文
+
+发布 job 不做 checkout 时，gh 命令推断不出目标仓库（fatal: not a git repository）。对策：job 的 env 里加 GH_REPO: ${{ github.repository }}。附带教训：产物已生成时别整炉重跑——手动走一遍发布（几分钟）比重编 3 小时划算。
+
+### 10.8 尾部截断吞报错
+
+make ... | tail -5 会把真正的错误行截掉，只留结论（如 "lua failed to build"），真凶被吞。看报错用 tail -25，或先落文件再 grep。
+
+### 10.9 软件源自动生成错误地址
+
+构建系统把自定义 feed 按官方镜像模板拼地址（.../snapshots/packages/架构/名字/packages.adb），必然 404，apk update 全程噪音。对策：hih-repo 包首启写入正确地址（按本机架构）+ 删掉自动生成的错误行 + 随包携带签名公钥——编进固件即"拿来即用"，这才是软件源的本意。
+
+### 10.10 多设备发布的三个设计决定
+
+1. 标签用纯日期（2026.11.27），设备短名进资产文件名（HiH-router-r4s-…）——标签认时间、文件认设备；
+2. 构建按设备独立：workflow_dispatch 支持只编指定设备，一台失败不拖累别的；
+3. 发布按日期"创建或追加"，全部设备到齐才从 beta 转正式；保留 3 个版本，旧的自动清理。更新脚本只认正式版（hih-update），校验和通过才刷机。
+
+### 10.11 术语规范
+
+自造词（基座、放窑、验尸、晋级清单等）让人猜，全部改用直白说法：OpenWrt 源码版本、触发编译、分析报错日志、收录包清单。规则：默认直白，比喻只在助于理解时用且用完即解释。
+
+### 10.12 杂项
+
+- gh 不在 Arch 官方仓库：用 AUR 助手或 GitHub releases 的 tarball；
+- python3-pyelftools（u-boot 需要）、cmake/libelf-dev（BTF 需要）容易漏装，已进依赖清单；
+- 手动下载的构建产物目录必须进 .gitignore（GitHub 单文件 100MB 限制）；
+- make defconfig 会解析所有包的 Makefile，是最快的包语法检查器（本地 10 秒轮替代 3 小时 CI 轮）。

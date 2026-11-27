@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=hih-repo
 PKG_VERSION:=25.12.6
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=H-i-H
@@ -21,12 +21,19 @@ define Package/hih-repo/description
  并清理构建时自动生成的错误地址。编进固件即开箱可用。
 endef
 
+define Build/Prepare
+	mkdir -p $(PKG_BUILD_DIR)
+endef
+
+define Build/Compile
+endef
+
 define Package/hih-repo/install
-$(INSTALL_DIR) $(1)/etc/apk/keys
-$(INSTALL_DATA) ./files/hih.pem $(1)/etc/apk/keys/
-$(INSTALL_DIR) $(1)/etc/uci-defaults
-$(INSTALL_BIN) ./files/96-hih-repo $(1)/etc/uci-defaults/
-sed -i 's|@RELEASE@|$(PKG_VERSION)|' $(1)/etc/uci-defaults/96-hih-repo
+	$(INSTALL_DIR) $(1)/etc/apk/keys
+	$(INSTALL_DATA) ./files/hih.pem $(1)/etc/apk/keys/
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/96-hih-repo $(1)/etc/uci-defaults/
+	sed -i 's|@RELEASE@|$(PKG_VERSION)|' $(1)/etc/uci-defaults/96-hih-repo
 endef
 
 $(eval $(call BuildPackage,hih-repo))
