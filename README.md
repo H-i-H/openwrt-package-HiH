@@ -174,3 +174,7 @@ APK_SIGN_KEY=<私钥> bash scripts/repo.sh    # 签名并组装软件源（repo/
 ## License
 
 各软件包遵循其上游许可证（多为 GPL-3.0）；仓库脚本与文档随仓库同权。
+## 拿来即用（编进固件）
+
+在 buildroot 中接入本 feed 后，再勾选 CONFIG_PACKAGE_hih-repo=y，
+固件首次启动会自动写入正确的软件源地址和签名公钥，无需手动配置。

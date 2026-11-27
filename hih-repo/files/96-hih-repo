@@ -1,0 +1,6 @@
+#!/bin/sh
+# HiH 软件源：写入正确地址（按本机架构），清理构建时生成的错误行
+. /etc/openwrt_release
+echo "https://h-i-h.github.io/openwrt-package-HiH/@RELEASE@/${DISTRIB_ARCH}/packages.adb" > /etc/apk/repositories.d/customfeeds.list
+sed -i '/HiH/d' /etc/apk/repositories.d/distfeeds.list
+exit 0
